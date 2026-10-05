@@ -1,5 +1,7 @@
 wl_library(api_health
   SRCS
+    game_state.cc
+    game_state.h
     health_server.cc
     health_server.h
   DEPENDS
