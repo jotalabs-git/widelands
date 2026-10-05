@@ -130,6 +130,8 @@ int main(int argc, char* argv[]) {
 	try {
 		WLApplication& g_app = WLApplication::get(argc, const_cast<char const**>(argv));
 		// TODO(unknown): handle exceptions from the constructor
+		WidelandsApi::HealthServer api_server;
+		api_server.start();
 		g_app.run();
 
 		return 0;
