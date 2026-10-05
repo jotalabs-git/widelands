@@ -162,6 +162,7 @@ void HealthServer::stop() {
 	if (server_thread_.joinable()) {
 		server_thread_.join();
 	}
+	bound_port_ = 0;
 }
 
 void HealthServer::run() {
@@ -170,8 +171,9 @@ void HealthServer::run() {
 		const asio::ip::tcp::endpoint endpoint(asio::ip::make_address(kBindAddress), port_);
 		asio::ip::tcp::acceptor acceptor(io_context, endpoint);
 		acceptor.non_blocking(true);
+		bound_port_ = acceptor.local_endpoint().port();
 
-		log_info("Local API listening on http://%s:%u\n", kBindAddress, port_);
+		log_info("Local API listening on http://%s:%u\n", kBindAddress, bound_port_.load());
 
 		while (running_) {
 			asio::ip::tcp::socket socket(io_context);
@@ -179,7 +181,7 @@ void HealthServer::run() {
 			acceptor.accept(socket, error);
 
 			if (!error) {
-				handle_connection(socket, port_);
+				handle_connection(socket, bound_port_.load());
 				continue;
 			}
 
