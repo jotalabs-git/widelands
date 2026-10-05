@@ -26,11 +26,15 @@ public:
 
 	void start();
 	void stop();
+	[[nodiscard]] uint16_t port() const {
+		return bound_port_;
+	}
 
 private:
 	void run();
 
 	const uint16_t port_;
+	std::atomic<uint16_t> bound_port_{0};
 	std::atomic<bool> running_{false};
 	std::thread server_thread_;
 };
