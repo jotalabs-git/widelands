@@ -227,6 +227,7 @@ wl_library(logic
   USES_SDL2
   USES_ATOMIC
   DEPENDS
+    api_health
     base
     base_crypto
     base_exceptions
