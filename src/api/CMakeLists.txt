@@ -1,3 +1,5 @@
+add_subdirectory(test)
+
 wl_library(api_health
   SRCS
     game_state.cc
