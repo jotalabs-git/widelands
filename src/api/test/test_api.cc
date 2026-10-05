@@ -13,6 +13,7 @@
 
 #include <asio.hpp>
 
+#include <array>
 #include <chrono>
 #include <sstream>
 #include <string>
