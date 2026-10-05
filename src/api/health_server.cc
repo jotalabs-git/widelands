@@ -17,6 +17,7 @@
 #include <string>
 #include <thread>
 
+#include "api/game_state.h"
 #include "base/log.h"
 #include "build_info.h"
 
@@ -73,6 +74,21 @@ std::string health_json(uint16_t port) {
 	return out.str();
 }
 
+std::string game_json() {
+	const GameStateSnapshot state = game_state_snapshot();
+	std::ostringstream out;
+	out << "{"
+	    << "\"running\":" << (state.running ? "true" : "false") << ","
+	    << "\"time_ms\":" << state.time_ms << ","
+	    << "\"map\":{"
+	    << "\"width\":" << state.map_width << ","
+	    << "\"height\":" << state.map_height
+	    << "},"
+	    << "\"players\":" << static_cast<unsigned>(state.players)
+	    << "}";
+	return out.str();
+}
+
 std::string response(int status, const std::string& reason, const std::string& body) {
 	std::ostringstream out;
 	out << "HTTP/1.1 " << status << " " << reason << "\r\n"
@@ -114,6 +130,8 @@ void handle_connection(asio::ip::tcp::socket& socket, uint16_t port) {
 	std::string http_response;
 	if (method == "GET" && path == "/health") {
 		http_response = response(200, "OK", health_json(port));
+	} else if (method == "GET" && path == "/api/v1/game") {
+		http_response = response(200, "OK", game_json());
 	} else {
 		http_response = response(404, "Not Found", "{\"error\":\"not_found\"}");
 	}
