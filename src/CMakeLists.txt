@@ -50,6 +50,7 @@ if (WIN32)
       main.cc
       ${WIN32_ICON_O}
     DEPENDS
+      api_health
       base_exceptions
       widelands_ball_of_mud
       build_info
@@ -59,6 +60,7 @@ else()
     SRCS
       main.cc
     DEPENDS
+      api_health
       base
       base_exceptions
       base_time_string
@@ -81,6 +83,7 @@ else()
 endif()
 
 add_subdirectory(third_party)
+add_subdirectory(api)
 add_subdirectory(ai)
 add_subdirectory(base)
 add_subdirectory(chat)
