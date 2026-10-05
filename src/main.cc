@@ -34,7 +34,8 @@
 #include <execinfo.h>
 #endif
 
-#include "api/health_server.h"\n#include "base/multithreading.h"
+#include "api/health_server.h"
+#include "base/multithreading.h"
 #include "base/time_string.h"
 #include "base/wexception.h"
 #include "build_info.h"
