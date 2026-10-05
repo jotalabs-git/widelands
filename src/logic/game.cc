@@ -18,6 +18,8 @@
 
 #include "logic/game.h"
 
+#include "api/game_state.h"
+
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -193,6 +195,7 @@ Game::Game()
 }
 
 Game::~Game() {
+	WidelandsApi::clear_game_state();
 	delete_pending_player_commands();
 }
 
@@ -890,6 +893,13 @@ void Game::think() {
 		// check if autosave is needed
 		savehandler_.think(*this);
 	}
+
+	const Map& current_map = map();
+	WidelandsApi::publish_game_state(state_ == gs_running,
+	                                 get_gametime().get(),
+	                                 current_map.get_width(),
+	                                 current_map.get_height(),
+	                                 current_map.get_nrplayers());
 }
 
 /**
