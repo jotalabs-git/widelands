@@ -10,6 +10,7 @@
 #include "api/game_state.h"
 
 #include <mutex>
+#include <utility>
 
 namespace WidelandsApi {
 namespace {
@@ -23,13 +24,15 @@ void publish_game_state(bool running,
                         uint32_t time_ms,
                         int32_t map_width,
                         int32_t map_height,
-                        uint8_t players) {
+                        uint8_t players,
+                        std::vector<PlayerStateSnapshot> player_states) {
 	std::lock_guard<std::mutex> lock(g_game_state_mutex);
 	g_game_state.running = running;
 	g_game_state.time_ms = time_ms;
 	g_game_state.map_width = map_width;
 	g_game_state.map_height = map_height;
 	g_game_state.players = players;
+	g_game_state.player_states = std::move(player_states);
 }
 
 void clear_game_state() {
