@@ -9,6 +9,7 @@
 
 #include "api/game_state.h"
 
+#include <deque>
 #include <mutex>
 #include <utility>
 
@@ -17,6 +18,8 @@ namespace {
 
 std::mutex g_game_state_mutex;
 GameStateSnapshot g_game_state;
+std::deque<ExternalPlayerCommand> g_external_commands;
+uint64_t g_next_external_command_id = 1;
 
 }  // namespace
 
@@ -43,6 +46,28 @@ void clear_game_state() {
 GameStateSnapshot game_state_snapshot() {
 	std::lock_guard<std::mutex> lock(g_game_state_mutex);
 	return g_game_state;
+}
+
+uint64_t enqueue_external_player_command(ExternalPlayerCommand command) {
+	std::lock_guard<std::mutex> lock(g_game_state_mutex);
+	command.id = g_next_external_command_id++;
+	g_external_commands.push_back(command);
+	return command.id;
+}
+
+std::optional<ExternalPlayerCommand> pop_external_player_command() {
+	std::lock_guard<std::mutex> lock(g_game_state_mutex);
+	if (g_external_commands.empty()) {
+		return std::nullopt;
+	}
+	ExternalPlayerCommand command = g_external_commands.front();
+	g_external_commands.pop_front();
+	return command;
+}
+
+void clear_external_player_commands() {
+	std::lock_guard<std::mutex> lock(g_game_state_mutex);
+	g_external_commands.clear();
 }
 
 }  // namespace WidelandsApi
