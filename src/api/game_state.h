@@ -11,6 +11,7 @@
 #define WL_API_GAME_STATE_H
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,18 @@ struct PlayerStateSnapshot {
 	std::string tribe;
 	uint8_t team{0};
 	bool defeated{false};
+};
+
+enum class ExternalPlayerCommandType : uint8_t {
+	kBuildFlag = 1,
+};
+
+struct ExternalPlayerCommand {
+	uint64_t id{0};
+	ExternalPlayerCommandType type{ExternalPlayerCommandType::kBuildFlag};
+	uint8_t player_id{0};
+	int32_t x{0};
+	int32_t y{0};
 };
 
 struct GameStateSnapshot {
@@ -41,6 +54,10 @@ void publish_game_state(bool running,
                         std::vector<PlayerStateSnapshot> player_states = {});
 void clear_game_state();
 GameStateSnapshot game_state_snapshot();
+
+uint64_t enqueue_external_player_command(ExternalPlayerCommand command);
+std::optional<ExternalPlayerCommand> pop_external_player_command();
+void clear_external_player_commands();
 
 }  // namespace WidelandsApi
 
