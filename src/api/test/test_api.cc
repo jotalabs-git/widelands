@@ -107,6 +107,58 @@ TESTCASE(game_endpoint_returns_published_snapshot) {
 	WidelandsApi::clear_game_state();
 }
 
+TESTCASE(player_endpoint_returns_published_player) {
+	WidelandsApi::publish_game_state(
+	   true, 154320, 128, 96, 2,
+	   {{1, "Alice", "barbarians", 1, false}, {2, "Bob", "empire", 2, true}});
+
+	WidelandsApi::HealthServer server(0);
+	server.start();
+	const uint16_t port = wait_for_port(server);
+	check_equal(port != 0, true);
+
+	const std::string response = get(port, "/api/v1/players/2");
+	check_equal(has(response, "HTTP/1.1 200 OK"), true);
+	check_equal(has(response, "\"id\":2"), true);
+	check_equal(has(response, "\"name\":\"Bob\""), true);
+	check_equal(has(response, "\"tribe\":\"empire\""), true);
+	check_equal(has(response, "\"team\":2"), true);
+	check_equal(has(response, "\"defeated\":true"), true);
+
+	server.stop();
+	WidelandsApi::clear_game_state();
+}
+
+TESTCASE(player_endpoint_returns_404_for_unknown_player) {
+	WidelandsApi::publish_game_state(
+	   true, 1000, 64, 64, 1, {{1, "Alice", "barbarians", 1, false}});
+
+	WidelandsApi::HealthServer server(0);
+	server.start();
+	const uint16_t port = wait_for_port(server);
+	check_equal(port != 0, true);
+
+	const std::string response = get(port, "/api/v1/players/2");
+	check_equal(has(response, "HTTP/1.1 404 Not Found"), true);
+	check_equal(has(response, "\"error\":\"player_not_found\""), true);
+
+	server.stop();
+	WidelandsApi::clear_game_state();
+}
+
+TESTCASE(player_endpoint_rejects_invalid_id) {
+	WidelandsApi::HealthServer server(0);
+	server.start();
+	const uint16_t port = wait_for_port(server);
+	check_equal(port != 0, true);
+
+	const std::string response = get(port, "/api/v1/players/nope");
+	check_equal(has(response, "HTTP/1.1 400 Bad Request"), true);
+	check_equal(has(response, "\"error\":\"invalid_player_id\""), true);
+
+	server.stop();
+}
+
 TESTCASE(unknown_endpoint_returns_404) {
 	WidelandsApi::HealthServer server(0);
 	server.start();
