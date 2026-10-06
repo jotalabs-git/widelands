@@ -23,6 +23,8 @@
 #include <cstdlib>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #ifndef _WIN32
 #include <unistd.h>  // for usleep
@@ -895,11 +897,24 @@ void Game::think() {
 	}
 
 	const Map& current_map = map();
+	std::vector<WidelandsApi::PlayerStateSnapshot> api_players;
+	for (PlayerNumber player_number = 1; player_number <= current_map.get_nrplayers(); ++player_number) {
+		if (const Player* player = get_player(player_number); player != nullptr) {
+			api_players.push_back(WidelandsApi::PlayerStateSnapshot{
+			   player_number,
+			   player->get_name(),
+			   player->tribe().name(),
+			   player->team_number(),
+			   player->is_defeated(),
+			});
+		}
+	}
 	WidelandsApi::publish_game_state(state_ == gs_running,
 	                                 get_gametime().get(),
 	                                 current_map.get_width(),
 	                                 current_map.get_height(),
-	                                 current_map.get_nrplayers());
+	                                 current_map.get_nrplayers(),
+	                                 std::move(api_players));
 }
 
 /**
