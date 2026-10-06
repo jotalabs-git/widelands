@@ -15,6 +15,7 @@
 #include <chrono>
 #include <sstream>
 #include <stdexcept>
+#include <unordered_map>
 #include <string>
 #include <thread>
 
@@ -138,6 +139,44 @@ const PlayerStateSnapshot* find_player(const GameStateSnapshot& state, uint8_t i
 	return nullptr;
 }
 
+std::unordered_map<std::string, std::string> parse_query(const std::string& query) {
+	std::unordered_map<std::string, std::string> result;
+	size_t start = 0;
+	while (start < query.size()) {
+		const size_t amp = query.find('&', start);
+		const std::string part = query.substr(start, amp == std::string::npos ? std::string::npos : amp - start);
+		const size_t equals = part.find('=');
+		if (equals != std::string::npos) {
+			result[part.substr(0, equals)] = part.substr(equals + 1);
+		}
+		if (amp == std::string::npos) {
+			break;
+		}
+		start = amp + 1;
+	}
+	return result;
+}
+
+bool parse_coordinate(const std::unordered_map<std::string, std::string>& query,
+                      const std::string& key,
+                      int32_t* value) {
+	const auto it = query.find(key);
+	if (it == query.end()) {
+		return false;
+	}
+	try {
+		size_t parsed = 0;
+		const long parsed_value = std::stol(it->second, &parsed);
+		if (parsed != it->second.size()) {
+			return false;
+		}
+		*value = static_cast<int32_t>(parsed_value);
+		return static_cast<long>(*value) == parsed_value;
+	} catch (const std::exception&) {
+		return false;
+	}
+}
+
 std::string response(int status, const std::string& reason, const std::string& body) {
 	std::ostringstream out;
 	out << "HTTP/1.1 " << status << " " << reason << "\r\n"
@@ -173,14 +212,67 @@ void handle_connection(asio::ip::tcp::socket& socket, uint16_t port) {
 
 	std::istringstream input(request);
 	std::string method;
-	std::string path;
-	input >> method >> path;
+	std::string target;
+	input >> method >> target;
+
+	const size_t question_mark = target.find('?');
+	const std::string path = target.substr(0, question_mark);
+	const std::string query_text =
+	   question_mark == std::string::npos ? "" : target.substr(question_mark + 1);
 
 	std::string http_response;
 	if (method == "GET" && path == "/health") {
 		http_response = response(200, "OK", health_json(port));
 	} else if (method == "GET" && path == "/api/v1/game") {
 		http_response = response(200, "OK", game_json());
+	} else if (method == "POST" &&
+	           path.rfind("/api/v1/players/", 0) == 0 &&
+	           path.find("/commands/build-flag") != std::string::npos) {
+		const std::string prefix = "/api/v1/players/";
+		const std::string suffix = "/commands/build-flag";
+		const size_t suffix_pos = path.find(suffix, prefix.size());
+		const std::string id_text =
+		   suffix_pos == std::string::npos ? "" : path.substr(prefix.size(), suffix_pos - prefix.size());
+
+		unsigned long id = 0;
+		try {
+			size_t parsed = 0;
+			id = std::stoul(id_text, &parsed);
+			if (parsed != id_text.size() || id == 0 || id > 255) {
+				throw std::invalid_argument("invalid player id");
+			}
+		} catch (const std::exception&) {
+			http_response = response(400, "Bad Request", "{\"error\":\"invalid_player_id\"}");
+			error.clear();
+			asio::write(socket, asio::buffer(http_response), error);
+			return;
+		}
+
+		const GameStateSnapshot state = game_state_snapshot();
+		if (!state.running) {
+			http_response = response(409, "Conflict", "{\"error\":\"game_not_running\"}");
+		} else if (find_player(state, static_cast<uint8_t>(id)) == nullptr) {
+			http_response = response(404, "Not Found", "{\"error\":\"player_not_found\"}");
+		} else {
+			const auto query = parse_query(query_text);
+			int32_t x = 0;
+			int32_t y = 0;
+			if (!parse_coordinate(query, "x", &x) || !parse_coordinate(query, "y", &y) ||
+			    x < 0 || y < 0 || x >= state.map_width || y >= state.map_height) {
+				http_response =
+				   response(400, "Bad Request", "{\"error\":\"invalid_coordinates\"}");
+			} else {
+				ExternalPlayerCommand command;
+				command.type = ExternalPlayerCommandType::kBuildFlag;
+				command.player_id = static_cast<uint8_t>(id);
+				command.x = x;
+				command.y = y;
+				const uint64_t command_id = enqueue_external_player_command(command);
+				std::ostringstream body;
+				body << "{\"status\":\"accepted\",\"command_id\":" << command_id << "}";
+				http_response = response(202, "Accepted", body.str());
+			}
+		}
 	} else if (method == "GET" && path.rfind("/api/v1/players/", 0) == 0) {
 		const std::string id_text = path.substr(std::string("/api/v1/players/").size());
 		unsigned long id = 0;
