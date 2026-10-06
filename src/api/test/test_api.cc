@@ -31,15 +31,15 @@ uint16_t wait_for_port(WidelandsApi::HealthServer& server) {
 	return 0;
 }
 
-std::string get(uint16_t port, const std::string& path) {
+std::string request(uint16_t port, const std::string& method, const std::string& path) {
 	asio::io_context io_context;
 	asio::ip::tcp::socket socket(io_context);
 	socket.connect(
 	   asio::ip::tcp::endpoint(asio::ip::make_address("127.0.0.1"), port));
 
-	const std::string request =
-	   "GET " + path + " HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
-	asio::write(socket, asio::buffer(request));
+	const std::string request_text =
+	   method + " " + path + " HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+	asio::write(socket, asio::buffer(request_text));
 
 	std::ostringstream response;
 	std::array<char, 4096> buffer{};
@@ -57,6 +57,14 @@ std::string get(uint16_t port, const std::string& path) {
 		}
 	}
 	return response.str();
+}
+
+std::string get(uint16_t port, const std::string& path) {
+	return request(port, "GET", path);
+}
+
+std::string post(uint16_t port, const std::string& path) {
+	return request(port, "POST", path);
 }
 
 bool has(const std::string& text, const std::string& expected) {
@@ -155,6 +163,67 @@ TESTCASE(player_endpoint_rejects_invalid_id) {
 	const std::string response = get(port, "/api/v1/players/nope");
 	check_equal(has(response, "HTTP/1.1 400 Bad Request"), true);
 	check_equal(has(response, "\"error\":\"invalid_player_id\""), true);
+
+	server.stop();
+}
+
+TESTCASE(build_flag_command_is_accepted_and_queued) {
+	WidelandsApi::publish_game_state(
+	   true, 1000, 64, 64, 1, {{1, "Alice", "barbarians", 0, false}});
+
+	WidelandsApi::HealthServer server(0);
+	server.start();
+	const uint16_t port = wait_for_port(server);
+	check_equal(port != 0, true);
+
+	const std::string response =
+	   post(port, "/api/v1/players/1/commands/build-flag?x=12&y=23");
+	check_equal(has(response, "HTTP/1.1 202 Accepted"), true);
+	check_equal(has(response, "\"status\":\"accepted\""), true);
+
+	const std::optional<WidelandsApi::ExternalPlayerCommand> command =
+	   WidelandsApi::pop_external_player_command();
+	check_equal(command.has_value(), true);
+	check_equal(command->player_id, 1);
+	check_equal(command->x, 12);
+	check_equal(command->y, 23);
+	check_equal(command->type == WidelandsApi::ExternalPlayerCommandType::kBuildFlag, true);
+
+	server.stop();
+	WidelandsApi::clear_game_state();
+}
+
+TESTCASE(build_flag_command_rejects_out_of_bounds_coordinates) {
+	WidelandsApi::publish_game_state(
+	   true, 1000, 64, 64, 1, {{1, "Alice", "barbarians", 0, false}});
+
+	WidelandsApi::HealthServer server(0);
+	server.start();
+	const uint16_t port = wait_for_port(server);
+	check_equal(port != 0, true);
+
+	const std::string response =
+	   post(port, "/api/v1/players/1/commands/build-flag?x=64&y=10");
+	check_equal(has(response, "HTTP/1.1 400 Bad Request"), true);
+	check_equal(has(response, "\"error\":\"invalid_coordinates\""), true);
+	check_equal(WidelandsApi::pop_external_player_command().has_value(), false);
+
+	server.stop();
+	WidelandsApi::clear_game_state();
+}
+
+TESTCASE(build_flag_command_requires_running_game) {
+	WidelandsApi::clear_game_state();
+
+	WidelandsApi::HealthServer server(0);
+	server.start();
+	const uint16_t port = wait_for_port(server);
+	check_equal(port != 0, true);
+
+	const std::string response =
+	   post(port, "/api/v1/players/1/commands/build-flag?x=10&y=10");
+	check_equal(has(response, "HTTP/1.1 409 Conflict"), true);
+	check_equal(has(response, "\"error\":\"game_not_running\""), true);
 
 	server.stop();
 }
