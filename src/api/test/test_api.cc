@@ -86,7 +86,9 @@ TESTCASE(health_endpoint_returns_system_info) {
 }
 
 TESTCASE(game_endpoint_returns_published_snapshot) {
-	WidelandsApi::publish_game_state(true, 154320, 128, 96, 3);
+	WidelandsApi::publish_game_state(
+	   true, 154320, 128, 96, 3,
+	   {{1, "Alice", "barbarians", 1, false}, {2, "Bob", "empire", 2, true}});
 
 	WidelandsApi::HealthServer server(0);
 	server.start();
