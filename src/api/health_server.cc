@@ -125,7 +125,11 @@ std::string player_json(const PlayerStateSnapshot& player) {
 	    << "\"name\":\"" << json_escape(player.name) << "\","
 	    << "\"tribe\":\"" << json_escape(player.tribe) << "\","
 	    << "\"team\":" << static_cast<unsigned>(player.team) << ","
-	    << "\"defeated\":" << (player.defeated ? "true" : "false")
+	    << "\"defeated\":" << (player.defeated ? "true" : "false") << ","
+	    << "\"starting_position\":{"
+	    << "\"x\":" << player.starting_x << ","
+	    << "\"y\":" << player.starting_y
+	    << "}"
 	    << "}";
 	return out.str();
 }
@@ -257,16 +261,15 @@ void handle_connection(asio::ip::tcp::socket& socket, uint16_t port) {
 			const auto query = parse_query(query_text);
 			int32_t x = 0;
 			int32_t y = 0;
-			if (!parse_coordinate(query, "x", &x) || !parse_coordinate(query, "y", &y) ||
-			    x < 0 || y < 0 || x >= state.map_width || y >= state.map_height) {
+			if (!parse_coordinate(query, "x", &x) || !parse_coordinate(query, "y", &y)) {
 				http_response =
 				   response(400, "Bad Request", "{\"error\":\"invalid_coordinates\"}");
 			} else {
 				ExternalPlayerCommand command;
 				command.type = ExternalPlayerCommandType::kBuildFlag;
 				command.player_id = static_cast<uint8_t>(id);
-				command.x = x;
-				command.y = y;
+				command.offset_x = x;
+				command.offset_y = y;
 				const uint64_t command_id = enqueue_external_player_command(command);
 				std::ostringstream body;
 				body << "{\"status\":\"accepted\",\"command_id\":" << command_id << "}";
