@@ -96,7 +96,7 @@ TESTCASE(health_endpoint_returns_system_info) {
 TESTCASE(game_endpoint_returns_published_snapshot) {
 	WidelandsApi::publish_game_state(
 	   true, 154320, 128, 96, 3,
-	   {{1, "Alice", "barbarians", 1, false}, {2, "Bob", "empire", 2, true}});
+	   {{1, "Alice", "barbarians", 1, false, 20, 30}, {2, "Bob", "empire", 2, true, 40, 50}});
 
 	WidelandsApi::HealthServer server(0);
 	server.start();
@@ -118,7 +118,7 @@ TESTCASE(game_endpoint_returns_published_snapshot) {
 TESTCASE(player_endpoint_returns_published_player) {
 	WidelandsApi::publish_game_state(
 	   true, 154320, 128, 96, 2,
-	   {{1, "Alice", "barbarians", 1, false}, {2, "Bob", "empire", 2, true}});
+	   {{1, "Alice", "barbarians", 1, false, 20, 30}, {2, "Bob", "empire", 2, true, 40, 50}});
 
 	WidelandsApi::HealthServer server(0);
 	server.start();
@@ -132,6 +132,7 @@ TESTCASE(player_endpoint_returns_published_player) {
 	check_equal(has(response, "\"tribe\":\"empire\""), true);
 	check_equal(has(response, "\"team\":2"), true);
 	check_equal(has(response, "\"defeated\":true"), true);
+	check_equal(has(response, "\"starting_position\":{\"x\":40,\"y\":50}"), true);
 
 	server.stop();
 	WidelandsApi::clear_game_state();
@@ -139,7 +140,7 @@ TESTCASE(player_endpoint_returns_published_player) {
 
 TESTCASE(player_endpoint_returns_404_for_unknown_player) {
 	WidelandsApi::publish_game_state(
-	   true, 1000, 64, 64, 1, {{1, "Alice", "barbarians", 1, false}});
+	   true, 1000, 64, 64, 1, {{1, "Alice", "barbarians", 1, false, 20, 30}});
 
 	WidelandsApi::HealthServer server(0);
 	server.start();
@@ -169,7 +170,7 @@ TESTCASE(player_endpoint_rejects_invalid_id) {
 
 TESTCASE(build_flag_command_is_accepted_and_queued) {
 	WidelandsApi::publish_game_state(
-	   true, 1000, 64, 64, 1, {{1, "Alice", "barbarians", 0, false}});
+	   true, 1000, 64, 64, 1, {{1, "Alice", "barbarians", 0, false, 20, 30}});
 
 	WidelandsApi::HealthServer server(0);
 	server.start();
@@ -177,7 +178,7 @@ TESTCASE(build_flag_command_is_accepted_and_queued) {
 	check_equal(port != 0, true);
 
 	const std::string response =
-	   post(port, "/api/v1/players/1/commands/build-flag?x=12&y=23");
+	   post(port, "/api/v1/players/1/commands/build-flag?x=-12&y=23");
 	check_equal(has(response, "HTTP/1.1 202 Accepted"), true);
 	check_equal(has(response, "\"status\":\"accepted\""), true);
 
@@ -185,17 +186,17 @@ TESTCASE(build_flag_command_is_accepted_and_queued) {
 	   WidelandsApi::pop_external_player_command();
 	check_equal(command.has_value(), true);
 	check_equal(command->player_id, 1);
-	check_equal(command->x, 12);
-	check_equal(command->y, 23);
+	check_equal(command->offset_x, -12);
+	check_equal(command->offset_y, 23);
 	check_equal(command->type == WidelandsApi::ExternalPlayerCommandType::kBuildFlag, true);
 
 	server.stop();
 	WidelandsApi::clear_game_state();
 }
 
-TESTCASE(build_flag_command_rejects_out_of_bounds_coordinates) {
+TESTCASE(build_flag_command_accepts_negative_relative_coordinates) {
 	WidelandsApi::publish_game_state(
-	   true, 1000, 64, 64, 1, {{1, "Alice", "barbarians", 0, false}});
+	   true, 1000, 64, 64, 1, {{1, "Alice", "barbarians", 0, false, 20, 30}});
 
 	WidelandsApi::HealthServer server(0);
 	server.start();
@@ -203,10 +204,14 @@ TESTCASE(build_flag_command_rejects_out_of_bounds_coordinates) {
 	check_equal(port != 0, true);
 
 	const std::string response =
-	   post(port, "/api/v1/players/1/commands/build-flag?x=64&y=10");
-	check_equal(has(response, "HTTP/1.1 400 Bad Request"), true);
-	check_equal(has(response, "\"error\":\"invalid_coordinates\""), true);
-	check_equal(WidelandsApi::pop_external_player_command().has_value(), false);
+	   post(port, "/api/v1/players/1/commands/build-flag?x=-4&y=-7");
+	check_equal(has(response, "HTTP/1.1 202 Accepted"), true);
+
+	const std::optional<WidelandsApi::ExternalPlayerCommand> command =
+	   WidelandsApi::pop_external_player_command();
+	check_equal(command.has_value(), true);
+	check_equal(command->offset_x, -4);
+	check_equal(command->offset_y, -7);
 
 	server.stop();
 	WidelandsApi::clear_game_state();
