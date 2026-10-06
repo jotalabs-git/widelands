@@ -877,6 +877,27 @@ void Game::do_send_player_command(PlayerCommand* pc) {
 void Game::think() {
 	assert(ctrl_);
 
+	while (const std::optional<WidelandsApi::ExternalPlayerCommand> external_command =
+	          WidelandsApi::pop_external_player_command()) {
+		if (state_ != gs_running) {
+			continue;
+		}
+		if (external_command->player_id == 0 ||
+		    get_player(external_command->player_id) == nullptr ||
+		    external_command->x < 0 || external_command->y < 0 ||
+		    external_command->x >= map().get_width() ||
+		    external_command->y >= map().get_height()) {
+			continue;
+		}
+
+		switch (external_command->type) {
+		case WidelandsApi::ExternalPlayerCommandType::kBuildFlag:
+			send_player_build_flag(external_command->player_id,
+			                       Coords(external_command->x, external_command->y));
+			break;
+		}
+	}
+
 	while (!pending_player_commands_.empty()) {
 		MutexLock m(MutexLock::ID::kCommands);
 		do_send_player_command(pending_player_commands_.front());
