@@ -884,17 +884,19 @@ void Game::think() {
 		}
 		if (external_command->player_id == 0 ||
 		    get_player(external_command->player_id) == nullptr ||
-		    external_command->x < 0 || external_command->y < 0 ||
-		    external_command->x >= map().get_width() ||
-		    external_command->y >= map().get_height()) {
+		    map().get_starting_pos(external_command->player_id) == Coords::null()) {
 			continue;
 		}
 
 		switch (external_command->type) {
-		case WidelandsApi::ExternalPlayerCommandType::kBuildFlag:
-			send_player_build_flag(external_command->player_id,
-			                       Coords(external_command->x, external_command->y));
+		case WidelandsApi::ExternalPlayerCommandType::kBuildFlag: {
+			const Coords starting_position = map().get_starting_pos(external_command->player_id);
+			Coords target(static_cast<int16_t>(starting_position.x + external_command->offset_x),
+			              static_cast<int16_t>(starting_position.y + external_command->offset_y));
+			map().normalize_coords(target);
+			send_player_build_flag(external_command->player_id, target);
 			break;
+		}
 		}
 	}
 
@@ -928,6 +930,8 @@ void Game::think() {
 			   player->tribe().name(),
 			   player->team_number(),
 			   player->is_defeated(),
+			   current_map.get_starting_pos(player_number).x,
+			   current_map.get_starting_pos(player_number).y,
 			});
 		}
 	}
