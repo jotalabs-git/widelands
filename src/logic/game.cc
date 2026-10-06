@@ -898,7 +898,8 @@ void Game::think() {
 
 	const Map& current_map = map();
 	std::vector<WidelandsApi::PlayerStateSnapshot> api_players;
-	for (PlayerNumber player_number = 1; player_number <= current_map.get_nrplayers(); ++player_number) {
+	for (PlayerNumber player_number = 1; player_number <= current_map.get_nrplayers();
+	     ++player_number) {
 		if (const Player* player = get_player(player_number); player != nullptr) {
 			api_players.push_back(WidelandsApi::PlayerStateSnapshot{
 			   player_number,
