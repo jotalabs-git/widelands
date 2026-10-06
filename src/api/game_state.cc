@@ -41,6 +41,7 @@ void publish_game_state(bool running,
 void clear_game_state() {
 	std::lock_guard<std::mutex> lock(g_game_state_mutex);
 	g_game_state = GameStateSnapshot{};
+	g_external_commands.clear();
 }
 
 GameStateSnapshot game_state_snapshot() {
