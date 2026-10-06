@@ -23,6 +23,8 @@ struct PlayerStateSnapshot {
 	std::string tribe;
 	uint8_t team{0};
 	bool defeated{false};
+	int32_t starting_x{0};
+	int32_t starting_y{0};
 };
 
 enum class ExternalPlayerCommandType : uint8_t {
@@ -33,8 +35,8 @@ struct ExternalPlayerCommand {
 	uint64_t id{0};
 	ExternalPlayerCommandType type{ExternalPlayerCommandType::kBuildFlag};
 	uint8_t player_id{0};
-	int32_t x{0};
-	int32_t y{0};
+	int32_t offset_x{0};
+	int32_t offset_y{0};
 };
 
 struct GameStateSnapshot {
