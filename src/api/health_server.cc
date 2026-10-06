@@ -74,6 +74,33 @@ std::string health_json(uint16_t port) {
 	return out.str();
 }
 
+std::string json_escape(const std::string& value) {
+	std::ostringstream out;
+	for (const char c : value) {
+		switch (c) {
+		case '\\':
+			out << "\\\\";
+			break;
+		case '"':
+			out << "\\\"";
+			break;
+		case '\n':
+			out << "\\n";
+			break;
+		case '\r':
+			out << "\\r";
+			break;
+		case '\t':
+			out << "\\t";
+			break;
+		default:
+			out << c;
+			break;
+		}
+	}
+	return out.str();
+}
+
 std::string game_json() {
 	const GameStateSnapshot state = game_state_snapshot();
 	std::ostringstream out;
@@ -87,6 +114,27 @@ std::string game_json() {
 	    << "\"players\":" << static_cast<unsigned>(state.players)
 	    << "}";
 	return out.str();
+}
+
+std::string player_json(const PlayerStateSnapshot& player) {
+	std::ostringstream out;
+	out << "{"
+	    << "\"id\":" << static_cast<unsigned>(player.id) << ","
+	    << "\"name\":\"" << json_escape(player.name) << "\","
+	    << "\"tribe\":\"" << json_escape(player.tribe) << "\","
+	    << "\"team\":" << static_cast<unsigned>(player.team) << ","
+	    << "\"defeated\":" << (player.defeated ? "true" : "false")
+	    << "}";
+	return out.str();
+}
+
+const PlayerStateSnapshot* find_player(const GameStateSnapshot& state, uint8_t id) {
+	for (const PlayerStateSnapshot& player : state.player_states) {
+		if (player.id == id) {
+			return &player;
+		}
+	}
+	return nullptr;
 }
 
 std::string response(int status, const std::string& reason, const std::string& body) {
@@ -132,6 +180,29 @@ void handle_connection(asio::ip::tcp::socket& socket, uint16_t port) {
 		http_response = response(200, "OK", health_json(port));
 	} else if (method == "GET" && path == "/api/v1/game") {
 		http_response = response(200, "OK", game_json());
+	} else if (method == "GET" && path.rfind("/api/v1/players/", 0) == 0) {
+		const std::string id_text = path.substr(std::string("/api/v1/players/").size());
+		unsigned long id = 0;
+		try {
+			size_t parsed = 0;
+			id = std::stoul(id_text, &parsed);
+			if (parsed != id_text.size() || id == 0 || id > 255) {
+				throw std::invalid_argument("invalid player id");
+			}
+		} catch (const std::exception&) {
+			http_response = response(400, "Bad Request", "{\"error\":\"invalid_player_id\"}");
+			error.clear();
+			asio::write(socket, asio::buffer(http_response), error);
+			return;
+		}
+
+		const GameStateSnapshot state = game_state_snapshot();
+		if (const PlayerStateSnapshot* player = find_player(state, static_cast<uint8_t>(id));
+		    player != nullptr) {
+			http_response = response(200, "OK", player_json(*player));
+		} else {
+			http_response = response(404, "Not Found", "{\"error\":\"player_not_found\"}");
+		}
 	} else {
 		http_response = response(404, "Not Found", "{\"error\":\"not_found\"}");
 	}
