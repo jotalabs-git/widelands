@@ -100,6 +100,7 @@
 #include "logic/filesystem_constants.h"
 #include "logic/game_settings.h"
 #include "logic/map_objects/checkstep.h"
+#include "logic/map_objects/map_object.h"
 #include "logic/map_objects/tribes/carrier.h"
 #include "logic/map_objects/tribes/market.h"
 #include "logic/map_objects/tribes/militarysite.h"
@@ -108,6 +109,7 @@
 #include "logic/map_objects/tribes/trainingsite.h"
 #include "logic/map_objects/tribes/tribe_descr.h"
 #include "logic/map_objects/tribes/warehouse.h"
+#include "logic/nodecaps.h"
 #include "logic/player.h"
 #include "logic/replay.h"
 #include "logic/replay_game_controller.h"
@@ -924,15 +926,60 @@ void Game::think() {
 	for (PlayerNumber player_number = 1; player_number <= current_map.get_nrplayers();
 	     ++player_number) {
 		if (const Player* player = get_player(player_number); player != nullptr) {
-			api_players.push_back(WidelandsApi::PlayerStateSnapshot{
+			const Coords start = current_map.get_starting_pos(player_number);
+			WidelandsApi::PlayerStateSnapshot snapshot{
 			   player_number,
 			   player->get_name(),
 			   player->tribe().name(),
 			   player->team_number(),
 			   player->is_defeated(),
-			   current_map.get_starting_pos(player_number).x,
-			   current_map.get_starting_pos(player_number).y,
-			});
+			   start.x,
+			   start.y,
+			};
+
+			const uint32_t tree_attribute = MapObjectDescr::get_attribute_id("tree");
+			constexpr int32_t kPerceptionRadius = 10;
+			for (int32_t dy = -kPerceptionRadius; dy <= kPerceptionRadius; ++dy) {
+				for (int32_t dx = -kPerceptionRadius; dx <= kPerceptionRadius; ++dx) {
+					Coords pos(static_cast<int16_t>(start.x + dx),
+					           static_cast<int16_t>(start.y + dy));
+					current_map.normalize_coords(pos);
+					const FCoords fcoords = current_map.get_fcoords(pos);
+					const BaseImmovable* immovable = fcoords.field->get_immovable();
+
+					if (immovable != nullptr && immovable->descr().has_attribute(tree_attribute)) {
+						snapshot.trees.push_back(WidelandsApi::PerceptionTreeSnapshot{
+						   pos.x, pos.y, dx, dy, immovable->descr().name()});
+					}
+
+					const NodeCaps caps = player->get_buildcaps(fcoords);
+					if ((caps & (BUILDCAPS_FLAG | BUILDCAPS_BUILDINGMASK)) != 0) {
+						snapshot.build_sites.push_back(WidelandsApi::PerceptionBuildSiteSnapshot{
+						   pos.x,
+						   pos.y,
+						   dx,
+						   dy,
+						   (caps & BUILDCAPS_FLAG) != 0,
+						   static_cast<uint8_t>(caps & BUILDCAPS_SIZEMASK),
+						   (caps & BUILDCAPS_MINE) != 0,
+						   (caps & BUILDCAPS_PORT) != 0,
+						});
+					}
+
+					if (immovable != nullptr && immovable->get_owner() == player &&
+					    immovable->descr().type() >= MapObjectType::BUILDING) {
+						snapshot.buildings.push_back(WidelandsApi::PerceptionBuildingSnapshot{
+						   pos.x,
+						   pos.y,
+						   dx,
+						   dy,
+						   immovable->descr().name(),
+						   to_string(immovable->descr().type()),
+						});
+					}
+				}
+			}
+			api_players.push_back(std::move(snapshot));
 		}
 	}
 	WidelandsApi::publish_game_state(state_ == gs_running,
