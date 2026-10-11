@@ -937,7 +937,7 @@ void Game::think() {
 			   start.y,
 			};
 
-			const uint32_t tree_attribute = MapObjectDescr::get_attribute_id("tree");
+			static const uint32_t tree_attribute = MapObjectDescr::get_attribute_id("tree");
 			constexpr int32_t kPerceptionRadius = 10;
 			for (int32_t dy = -kPerceptionRadius; dy <= kPerceptionRadius; ++dy) {
 				for (int32_t dx = -kPerceptionRadius; dx <= kPerceptionRadius; ++dx) {
