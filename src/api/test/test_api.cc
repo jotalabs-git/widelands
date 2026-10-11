@@ -168,6 +168,31 @@ TESTCASE(player_endpoint_rejects_invalid_id) {
 	server.stop();
 }
 
+TESTCASE(perception_endpoint_returns_snapshot) {
+	WidelandsApi::PlayerStateSnapshot player{
+	   1, "Alice", "barbarians", 0, false, 20, 30};
+	player.trees.push_back({22, 28, 2, -2, "alder_summer_old"});
+	player.build_sites.push_back({21, 30, 1, 0, true, 2, false, false});
+	player.buildings.push_back({20, 30, 0, 0, "barbarians_headquarters", "warehouse"});
+	WidelandsApi::publish_game_state(true, 1000, 64, 64, 1, {player});
+
+	WidelandsApi::HealthServer server(0);
+	server.start();
+	const uint16_t port = wait_for_port(server);
+	check_equal(port != 0, true);
+
+	const std::string response = get(port, "/api/v1/players/1/perception");
+	check_equal(has(response, "HTTP/1.1 200 OK"), true);
+	check_equal(has(response, "\"origin\":{\"x\":20,\"y\":30}"), true);
+	check_equal(has(response, "\"relative_x\":2"), true);
+	check_equal(has(response, "\"name\":\"alder_summer_old\""), true);
+	check_equal(has(response, "\"building_size\":2"), true);
+	check_equal(has(response, "\"name\":\"barbarians_headquarters\""), true);
+
+	server.stop();
+	WidelandsApi::clear_game_state();
+}
+
 TESTCASE(build_flag_command_is_accepted_and_queued) {
 	WidelandsApi::publish_game_state(
 	   true, 1000, 64, 64, 1, {{1, "Alice", "barbarians", 0, false, 20, 30}});
