@@ -185,6 +185,7 @@ std::string perception_json(const PlayerStateSnapshot& player) {
 	std::ostringstream out;
 	out << "{"
 	    << "\"player_id\":" << static_cast<unsigned>(player.id) << ","
+	    << "\"radius\":10,"
 	    << "\"origin\":{\"x\":" << player.starting_x << ",\"y\":" << player.starting_y << "},"
 	    << "\"trees\":[";
 	for (size_t i = 0; i < player.trees.size(); ++i) {
