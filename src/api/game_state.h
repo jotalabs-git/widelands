@@ -17,6 +17,34 @@
 
 namespace WidelandsApi {
 
+struct PerceptionTreeSnapshot {
+	int32_t x{0};
+	int32_t y{0};
+	int32_t relative_x{0};
+	int32_t relative_y{0};
+	std::string name;
+};
+
+struct PerceptionBuildSiteSnapshot {
+	int32_t x{0};
+	int32_t y{0};
+	int32_t relative_x{0};
+	int32_t relative_y{0};
+	bool flag{false};
+	uint8_t building_size{0};
+	bool mine{false};
+	bool port{false};
+};
+
+struct PerceptionBuildingSnapshot {
+	int32_t x{0};
+	int32_t y{0};
+	int32_t relative_x{0};
+	int32_t relative_y{0};
+	std::string name;
+	std::string type;
+};
+
 struct PlayerStateSnapshot {
 	uint8_t id{0};
 	std::string name;
@@ -25,6 +53,9 @@ struct PlayerStateSnapshot {
 	bool defeated{false};
 	int32_t starting_x{0};
 	int32_t starting_y{0};
+	std::vector<PerceptionTreeSnapshot> trees;
+	std::vector<PerceptionBuildSiteSnapshot> build_sites;
+	std::vector<PerceptionBuildingSnapshot> buildings;
 };
 
 enum class ExternalPlayerCommandType : uint8_t {
