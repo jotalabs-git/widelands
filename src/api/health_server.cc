@@ -181,6 +181,52 @@ bool parse_coordinate(const std::unordered_map<std::string, std::string>& query,
 	}
 }
 
+std::string perception_json(const PlayerStateSnapshot& player) {
+	std::ostringstream out;
+	out << "{"
+	    << "\"player_id\":" << static_cast<unsigned>(player.id) << ","
+	    << "\"origin\":{\"x\":" << player.starting_x << ",\"y\":" << player.starting_y << "},"
+	    << "\"trees\":[";
+	for (size_t i = 0; i < player.trees.size(); ++i) {
+		if (i > 0) {
+			out << ",";
+		}
+		const auto& tree = player.trees[i];
+		out << "{\"x\":" << tree.x << ",\"y\":" << tree.y
+		    << ",\"relative_x\":" << tree.relative_x
+		    << ",\"relative_y\":" << tree.relative_y
+		    << ",\"name\":\"" << json_escape(tree.name) << "\"}";
+	}
+	out << "],\"build_sites\":[";
+	for (size_t i = 0; i < player.build_sites.size(); ++i) {
+		if (i > 0) {
+			out << ",";
+		}
+		const auto& site = player.build_sites[i];
+		out << "{\"x\":" << site.x << ",\"y\":" << site.y
+		    << ",\"relative_x\":" << site.relative_x
+		    << ",\"relative_y\":" << site.relative_y
+		    << ",\"flag\":" << (site.flag ? "true" : "false")
+		    << ",\"building_size\":" << static_cast<unsigned>(site.building_size)
+		    << ",\"mine\":" << (site.mine ? "true" : "false")
+		    << ",\"port\":" << (site.port ? "true" : "false") << "}";
+	}
+	out << "],\"buildings\":[";
+	for (size_t i = 0; i < player.buildings.size(); ++i) {
+		if (i > 0) {
+			out << ",";
+		}
+		const auto& building = player.buildings[i];
+		out << "{\"x\":" << building.x << ",\"y\":" << building.y
+		    << ",\"relative_x\":" << building.relative_x
+		    << ",\"relative_y\":" << building.relative_y
+		    << ",\"name\":\"" << json_escape(building.name)
+		    << "\",\"type\":\"" << json_escape(building.type) << "\"}";
+	}
+	out << "]}";
+	return out.str();
+}
+
 std::string response(int status, const std::string& reason, const std::string& body) {
 	std::ostringstream out;
 	out << "HTTP/1.1 " << status << " " << reason << "\r\n"
@@ -275,6 +321,34 @@ void handle_connection(asio::ip::tcp::socket& socket, uint16_t port) {
 				body << "{\"status\":\"accepted\",\"command_id\":" << command_id << "}";
 				http_response = response(202, "Accepted", body.str());
 			}
+		}
+	} else if (method == "GET" &&
+	           path.rfind("/api/v1/players/", 0) == 0 &&
+	           path.find("/perception") != std::string::npos) {
+		const std::string prefix = "/api/v1/players/";
+		const std::string suffix = "/perception";
+		const size_t suffix_pos = path.find(suffix, prefix.size());
+		const std::string id_text =
+		   suffix_pos == std::string::npos ? "" : path.substr(prefix.size(), suffix_pos - prefix.size());
+		unsigned long id = 0;
+		try {
+			size_t parsed = 0;
+			id = std::stoul(id_text, &parsed);
+			if (parsed != id_text.size() || id == 0 || id > 255) {
+				throw std::invalid_argument("invalid player id");
+			}
+		} catch (const std::exception&) {
+			http_response = response(400, "Bad Request", "{\"error\":\"invalid_player_id\"}");
+			error.clear();
+			asio::write(socket, asio::buffer(http_response), error);
+			return;
+		}
+		const GameStateSnapshot state = game_state_snapshot();
+		if (const PlayerStateSnapshot* player = find_player(state, static_cast<uint8_t>(id));
+		    player != nullptr) {
+			http_response = response(200, "OK", perception_json(*player));
+		} else {
+			http_response = response(404, "Not Found", "{\"error\":\"player_not_found\"}");
 		}
 	} else if (method == "GET" && path.rfind("/api/v1/players/", 0) == 0) {
 		const std::string id_text = path.substr(std::string("/api/v1/players/").size());
